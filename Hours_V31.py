@@ -228,7 +228,11 @@ def per_series_downsample_long(long_df: pd.DataFrame, max_points: int) -> pd.Dat
 
 
 def extract_db_file_name(path: Path) -> str:
-    return path.parent.name   # Already in expected format DATAYYYY-MM-DD-HH-MM-SS
+    # If file is in DATAxxxx/tables/, go up two levels; else, one level
+    if path.parent.name == "tables":
+        return path.parent.parent.name
+    else:
+        return path.parent.name
 
 
 def get_non_overlapping_window(db_new_start_ts: float,
@@ -1508,10 +1512,11 @@ existing_active_state = load_cache("active_state")
 # Existing db files already processed
 existing_db_files = set(existing_runtime["db File"].dropna().astype(str).unique()) if not existing_runtime.empty else set()
 
-# Pair commands.parquet and messages.parquet by folder name
+
+
+# Pair commands.parquet and messages.parquet by folder (root or tables)
 paired_files = []
 for cmd in command_files:
-    folder = cmd.parent.name                         # ex: DATA2025-10-27-12-26-48
     msg = cmd.parent / "messages.parquet"
     if msg.exists():
         paired_files.append((cmd, msg))
@@ -1519,7 +1524,7 @@ for cmd in command_files:
 # Filter out already processed db files
 new_pairs = []
 for cmd, msg in paired_files:
-    db_file = extract_db_file_name(cmd)              # now returns folder name
+    db_file = extract_db_file_name(cmd)
     if db_file not in existing_db_files:
         new_pairs.append((cmd, msg))
 
@@ -1582,7 +1587,7 @@ if new_pairs:
 
             # 1. Update durations_df with raw bounds for this file
             df_duration_raw = compute_db_file_duration_raw(messages_file)
-            durations_df = pd.concat([durations_df, df_duration_raw], ignore_index=True)
+            durations_df = pd.concat([df for df in [durations_df, df_duration_raw] if not df.empty and not df.isna().all().all()], ignore_index=True)
             durations_df = durations_df.drop_duplicates(subset=["db File"]).reset_index(drop=True)
 
             # After all compute_* calls for this file, add this:
@@ -1599,7 +1604,12 @@ if new_pairs:
             if not df_db_file_duration.empty:
                 all_db_file_duration.append(df_db_file_duration)
             if not df_run.empty:
+                # print(f"Saving {db_file} to cache")
                 all_runtime.append(df_run)
+            else:
+                # print(f"Skipping {db_file}: no data to save")
+                # Add a dummy entry to mark as processed
+                all_runtime.append(pd.DataFrame([{"db File": db_file}]))
             if not df_reb.empty:
                 all_reboiler.append(df_reb)
             if not df_sorb.empty:
@@ -1651,35 +1661,35 @@ if new_pairs:
 
             # --- PATCH: Save to Excel after each db file ---
             # Concatenate new results so far
-            new_db_file_duration_df = pd.concat(all_db_file_duration, ignore_index=True) if all_db_file_duration else pd.DataFrame()
-            new_runtime_df = pd.concat(all_runtime, ignore_index=True) if all_runtime else pd.DataFrame()
-            new_reboiler_df = pd.concat(all_reboiler, ignore_index=True) if all_reboiler else pd.DataFrame()
-            new_sorb_df = pd.concat(all_sorb, ignore_index=True) if all_sorb else pd.DataFrame()
-            new_bigfan_pwm_df = pd.concat(all_bigfan_pwm, ignore_index=True) if all_bigfan_pwm else pd.DataFrame()
-            new_recycle_pump_1_rpm_df = pd.concat(all_recycle_pump_1_rpm, ignore_index=True) if all_recycle_pump_1_rpm else pd.DataFrame()
-            new_recycle_pump_2_rpm_df = pd.concat(all_recycle_pump_2_rpm, ignore_index=True) if all_recycle_pump_2_rpm else pd.DataFrame()
-            new_weather_df = pd.concat(all_weather, ignore_index=True) if all_weather else pd.DataFrame()
-            new_mean_df = pd.concat(all_mean, ignore_index=True) if all_mean else pd.DataFrame()
-            new_mean_residence_df = pd.concat(all_mean_residence, ignore_index=True) if all_mean_residence else pd.DataFrame()
-            new_compressor_stage_1_df = pd.concat(all_compressor_stage_1, ignore_index=True) if all_compressor_stage_1 else pd.DataFrame()
-            new_compressor_stage_2_df = pd.concat(all_compressor_stage_2, ignore_index=True) if all_compressor_stage_2 else pd.DataFrame()
-            new_compressor_stage_1_temp_df = pd.concat(all_compressor_stage_1_temp, ignore_index=True) if all_compressor_stage_1_temp else pd.DataFrame()
-            new_compressor_stage_2_temp_df = pd.concat(all_compressor_stage_2_temp, ignore_index=True) if all_compressor_stage_2_temp else pd.DataFrame()
-            new_aec_stack_1_current_df = pd.concat(all_aec_stack_1_current, ignore_index=True) if all_aec_stack_1_current else pd.DataFrame()
-            new_aec_stack_2_current_df = pd.concat(all_aec_stack_2_current, ignore_index=True) if all_aec_stack_2_current else pd.DataFrame()
-            new_aec_stack_3_current_df = pd.concat(all_aec_stack_3_current, ignore_index=True) if all_aec_stack_3_current else pd.DataFrame()
-            new_aec_stack_4_current_df = pd.concat(all_aec_stack_4_current, ignore_index=True) if all_aec_stack_4_current else pd.DataFrame()
-            new_aec_stack_1_current_density_df = pd.concat(all_aec_stack_1_current_density, ignore_index=True) if all_aec_stack_1_current_density else pd.DataFrame()
-            new_aec_stack_2_current_density_df = pd.concat(all_aec_stack_2_current_density, ignore_index=True) if all_aec_stack_2_current_density else pd.DataFrame()
-            new_aec_stack_3_current_density_df = pd.concat(all_aec_stack_3_current_density, ignore_index=True) if all_aec_stack_3_current_density else pd.DataFrame()
-            new_aec_stack_4_current_density_df = pd.concat(all_aec_stack_4_current_density, ignore_index=True) if all_aec_stack_4_current_density else pd.DataFrame()
-            new_aec_oxygen_temp_df = pd.concat(all_aec_oxygen_temp, ignore_index=True) if all_aec_oxygen_temp else pd.DataFrame()
-            new_aec_hydrogen_temp_df = pd.concat(all_aec_hydrogen_temp, ignore_index=True) if all_aec_hydrogen_temp else pd.DataFrame()
-            new_aec_oxygen_pressure_df = pd.concat(all_aec_oxygen_pressure, ignore_index=True) if all_aec_oxygen_pressure else pd.DataFrame()
-            new_active_state_df = pd.concat(all_active_state, ignore_index=True) if all_active_state else pd.DataFrame()
+            new_db_file_duration_df = pd.concat([df for df in all_db_file_duration if not df.empty and not df.isna().all().all()], ignore_index=True) if all_db_file_duration else pd.DataFrame()
+            new_runtime_df = pd.concat([df for df in all_runtime if not df.empty and not df.isna().all().all()], ignore_index=True) if all_runtime else pd.DataFrame()
+            new_reboiler_df = pd.concat([df for df in all_reboiler if not df.empty and not df.isna().all().all()], ignore_index=True) if all_reboiler else pd.DataFrame()
+            new_sorb_df = pd.concat([df for df in all_sorb if not df.empty and not df.isna().all().all()], ignore_index=True) if all_sorb else pd.DataFrame()
+            new_bigfan_pwm_df = pd.concat([df for df in all_bigfan_pwm if not df.empty and not df.isna().all().all()], ignore_index=True) if all_bigfan_pwm else pd.DataFrame()
+            new_recycle_pump_1_rpm_df = pd.concat([df for df in all_recycle_pump_1_rpm if not df.empty and not df.isna().all().all()], ignore_index=True) if all_recycle_pump_1_rpm else pd.DataFrame()
+            new_recycle_pump_2_rpm_df = pd.concat([df for df in all_recycle_pump_2_rpm if not df.empty and not df.isna().all().all()], ignore_index=True) if all_recycle_pump_2_rpm else pd.DataFrame()
+            new_weather_df = pd.concat([df for df in all_weather if not df.empty and not df.isna().all().all()], ignore_index=True) if all_weather else pd.DataFrame()
+            new_mean_df = pd.concat([df for df in all_mean if not df.empty and not df.isna().all().all()], ignore_index=True) if all_mean else pd.DataFrame()
+            new_mean_residence_df = pd.concat([df for df in all_mean_residence if not df.empty and not df.isna().all().all()], ignore_index=True) if all_mean_residence else pd.DataFrame()
+            new_compressor_stage_1_df = pd.concat([df for df in all_compressor_stage_1 if not df.empty and not df.isna().all().all()], ignore_index=True) if all_compressor_stage_1 else pd.DataFrame()
+            new_compressor_stage_2_df = pd.concat([df for df in all_compressor_stage_2 if not df.empty and not df.isna().all().all()], ignore_index=True) if all_compressor_stage_2 else pd.DataFrame()
+            new_compressor_stage_1_temp_df = pd.concat([df for df in all_compressor_stage_1_temp if not df.empty and not df.isna().all().all()], ignore_index=True) if all_compressor_stage_1_temp else pd.DataFrame()
+            new_compressor_stage_2_temp_df = pd.concat([df for df in all_compressor_stage_2_temp if not df.empty and not df.isna().all().all()], ignore_index=True) if all_compressor_stage_2_temp else pd.DataFrame()
+            new_aec_stack_1_current_df = pd.concat([df for df in all_aec_stack_1_current if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_1_current else pd.DataFrame()
+            new_aec_stack_2_current_df = pd.concat([df for df in all_aec_stack_2_current if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_2_current else pd.DataFrame()
+            new_aec_stack_3_current_df = pd.concat([df for df in all_aec_stack_3_current if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_3_current else pd.DataFrame()
+            new_aec_stack_4_current_df = pd.concat([df for df in all_aec_stack_4_current if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_4_current else pd.DataFrame()
+            new_aec_stack_1_current_density_df = pd.concat([df for df in all_aec_stack_1_current_density if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_1_current_density else pd.DataFrame()
+            new_aec_stack_2_current_density_df = pd.concat([df for df in all_aec_stack_2_current_density if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_2_current_density else pd.DataFrame()
+            new_aec_stack_3_current_density_df = pd.concat([df for df in all_aec_stack_3_current_density if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_3_current_density else pd.DataFrame()
+            new_aec_stack_4_current_density_df = pd.concat([df for df in all_aec_stack_4_current_density if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_stack_4_current_density else pd.DataFrame()
+            new_aec_oxygen_temp_df = pd.concat([df for df in all_aec_oxygen_temp if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_oxygen_temp else pd.DataFrame()
+            new_aec_hydrogen_temp_df = pd.concat([df for df in all_aec_hydrogen_temp if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_hydrogen_temp else pd.DataFrame()
+            new_aec_oxygen_pressure_df = pd.concat([df for df in all_aec_oxygen_pressure if not df.empty and not df.isna().all().all()], ignore_index=True) if all_aec_oxygen_pressure else pd.DataFrame()
+            new_active_state_df = pd.concat([df for df in all_active_state if not df.empty and not df.isna().all().all()], ignore_index=True) if all_active_state else pd.DataFrame()
 
             # Merge with existing
-            db_file_duration_df = pd.concat([existing_db_file_duration, new_db_file_duration_df], ignore_index=True) if not existing_db_file_duration.empty or not new_db_file_duration_df.empty else pd.DataFrame()
+            db_file_duration_df = pd.concat([df for df in [existing_db_file_duration, new_db_file_duration_df] if not df.empty and not df.isna().all().all()], ignore_index=True) if not existing_db_file_duration.empty or not new_db_file_duration_df.empty else pd.DataFrame()
             runtime_df = pd.concat([existing_runtime, new_runtime_df], ignore_index=True) if not existing_runtime.empty or not new_runtime_df.empty else pd.DataFrame()
             reboiler_df = pd.concat([existing_reboiler, new_reboiler_df], ignore_index=True) if not existing_reboiler.empty or not new_reboiler_df.empty else pd.DataFrame()
             sorb_df = pd.concat([existing_sorb, new_sorb_df], ignore_index=True) if not existing_sorb.empty or not new_sorb_df.empty else pd.DataFrame()

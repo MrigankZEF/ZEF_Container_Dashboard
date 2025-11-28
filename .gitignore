@@ -3,3 +3,7 @@
 Parquet_Exports/*
 !Parquet_Exports/cache/
 !Parquet_Exports/cache/**
+# Ignore clear_cache.py if it exists
+clear_cache.py
+# Ignore list_databases_saved.py if it exists
+list_databases_saved.py
