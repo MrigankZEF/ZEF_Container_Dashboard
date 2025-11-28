@@ -906,11 +906,43 @@ def compute_active_state_for_file(messages_file: Path, durations_df: pd.DataFram
 # Compute total_gui_time from db_file_duration
 # -------------------------
 
+
+# -------------------------
+# Total GUI Time Computation (With overlap detection)
+# -------------------------
+def compute_total_gui_time(db_file_duration_df: pd.DataFrame) -> float:
+    """
+    Compute total GUI time as the sum of all non-overlapping durations
+    from the db_file_duration parquet cache.
+    """
+    # Filter out rows with missing timestamps
+    df = db_file_duration_df.dropna(subset=["Start Time Stamp (s)", "End Time Stamp (s)"]).copy()
+    if df.empty:
+        return 0.0
+
+    # Build list of (start, end) tuples
+    intervals = sorted(
+        [(float(row["Start Time Stamp (s)"]), float(row["End Time Stamp (s)"]))
+         for _, row in df.iterrows() if row["End Time Stamp (s)"] > row["Start Time Stamp (s)"]],
+        key=lambda x: x[0]
+    )
+
+    # Merge overlapping intervals
+    merged = []
+    for start, end in intervals:
+        if not merged or start > merged[-1][1]:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+
+    # Sum durations
+    total = sum(end - start for start, end in merged)
+    return total / 3600.0  # convert seconds to hours
+
+# Use parquet cache for total_gui_time
 db_file_duration_df = load_cache("db_file_duration")
-if not db_file_duration_df.empty and "End Time Stamp (s)" in db_file_duration_df.columns and "Start Time Stamp (s)" in db_file_duration_df.columns:
-    min_start = db_file_duration_df["Start Time Stamp (s)"].min()
-    max_end = db_file_duration_df["End Time Stamp (s)"].max()
-    total_gui_time = (max_end - min_start) / 3600.0 if pd.notnull(min_start) and pd.notnull(max_end) else 0.0
+if not db_file_duration_df.empty:
+    total_gui_time = compute_total_gui_time(db_file_duration_df)
 else:
     total_gui_time = 0.0
 
