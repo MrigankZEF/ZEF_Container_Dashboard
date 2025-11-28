@@ -20,7 +20,7 @@ jobs:
         run: |
           mkdir -p ~/.config/rclone
           echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
-          rclone sync "ZEF_Container_Dashboard:Container Plant Dashboard/Parquet_Exports/cache" cache --create-empty-src-dirs --progress
+          rclone sync "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports/cache" cache --create-empty-src-dirs --progress
 
       - name: Commit and push if changed
         run: |
