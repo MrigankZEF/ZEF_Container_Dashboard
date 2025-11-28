@@ -2,8 +2,8 @@ name: Auto-sync cache from Google Drive
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # Every 6 hours
-  workflow_dispatch:        # Also allows manual trigger
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   sync-cache:
@@ -14,15 +14,15 @@ jobs:
       - name: Install rclone
         run: sudo apt-get update && sudo apt-get install -y rclone
 
-      - name: Sync cache folder only
+      - name: Sync cache folder
         env:
           RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
         run: |
           mkdir -p ~/.config/rclone
           echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
-          rclone sync ZEF_Container_Dashboard:Parquet_Exports/cache cache --progress --create-empty-src-dirs
+          rclone sync "ZEF_Container_Dashboard:Container Plant Dashboard/Parquet_Exports/cache" cache --create-empty-src-dirs --progress
 
-      - name: Commit and push if cache changed
+      - name: Commit and push if changed
         run: |
           git config user.name "Auto-sync Bot"
           git config user.email "bot@noreply.github.com"
