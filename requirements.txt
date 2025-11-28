@@ -1,0 +1,6 @@
+# Add your project dependencies here, one per line.
+pandas
+pyarrow
+streamlit
+plotly
+numpy

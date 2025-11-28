@@ -1,0 +1,9 @@
+# Never commit raw data
+Parquet_Exports/
+*.parquet
+# But DO commit cache
+!cache/
+
+# Ignore all files in Parquet_Exports except those in cache
+Parquet_Exports/**
+!Parquet_Exports/cache/
