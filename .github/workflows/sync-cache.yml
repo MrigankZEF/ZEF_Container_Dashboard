@@ -13,6 +13,19 @@ jobs:
         with:
           fetch-depth: 0   # ← forces full clone so empty folders exist
 
+
+      - name: Install rclone
+        run: sudo apt-get update && sudo apt-get install -y rclone
+
+      - name: Sync all Parquet_Exports data folders (excluding cache) from Google Drive
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+          # Sync all Parquet_Exports folders except cache
+          rclone sync "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports" Parquet_Exports --exclude 'cache/**' --progress || true
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -25,9 +38,6 @@ jobs:
       - name: Generate Parquet cache
         run: |
           python generate_cache.py
-
-      - name: Install rclone
-        run: sudo apt-get update && sudo apt-get install -y rclone
 
       - name: Sync cache folder
         env:
