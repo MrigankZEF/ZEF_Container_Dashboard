@@ -13,6 +13,19 @@ jobs:
         with:
           fetch-depth: 0   # ← forces full clone so empty folders exist
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate Parquet cache
+        run: |
+          python generate_cache.py
+
       - name: Install rclone
         run: sudo apt-get update && sudo apt-get install -y rclone
 
