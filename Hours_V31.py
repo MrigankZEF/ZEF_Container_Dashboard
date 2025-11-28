@@ -1440,9 +1440,9 @@ command_files = find_parquet_files(PARENT_RUNS_FOLDER, "commands.parquet")
 message_files = find_parquet_files(PARENT_RUNS_FOLDER, "messages.parquet")
 
 
-if not command_files or not message_files:
-    st.error(f"No commands_* or messages_* parquet files found in {PARENT_RUNS_FOLDER}")
-    st.stop()
+# if not command_files or not message_files:
+#     st.error(f"No commands_* or messages_* parquet files found in {PARENT_RUNS_FOLDER}")
+#     st.stop()
 
 
 # Load existing Parquet cache if present
