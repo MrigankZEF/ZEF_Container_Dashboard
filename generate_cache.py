@@ -80,8 +80,10 @@ all_active_state = []
 
 
 # For headless operation, pass empty DataFrames for durations_df where required
+
 for commands_file, messages_file in paired_files:
     db_file = extract_db_file_name(commands_file)
+    print(f"Processing db file: {db_file}")
     df_db_file_duration = compute_db_file_duration(messages_file)
     df_run = compute_all_runtimes(messages_file, pd.DataFrame())
     df_reb = compute_reboiler_temperature_for_file(messages_file, pd.DataFrame())
@@ -163,8 +165,10 @@ for commands_file, messages_file in paired_files:
         all_active_state.append(df_active)
 
 # Concatenate and save all cache files
+
 def concat_and_save(name, dfs):
     df = pd.concat([df for df in dfs if not df.empty and not df.isna().all().all()], ignore_index=True) if dfs else pd.DataFrame()
+    print(f"Updating cache file: {name}.parquet, rows to add: {len(df)}")
     save_cache(name, df)
 
 concat_and_save("db_file_duration", all_db_file_duration)
