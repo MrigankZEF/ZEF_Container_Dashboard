@@ -19,12 +19,20 @@ from Hours_V31 import (
     compute_aec_oxygen_pressure_for_file, compute_active_state_for_file
 )
 
+
 # UNIVERSAL PATH LOGIC — works everywhere
 REMOTE_PATH = "ZEF_Container_Dashboard:Parquet_Exports"
 
-if os.getenv("PARENT_RUNS_FOLDER"):
-    PARENT_RUNS_FOLDER = os.getenv("PARENT_RUNS_FOLDER")   # GitHub Actions uses this
-    CACHE_DIR = Path("cache")
+env_val = os.getenv("PARENT_RUNS_FOLDER")
+if env_val:
+    # If it's a remote path (contains ':'), use local Parquet_Exports for file ops
+    if ":" in env_val:
+        print(f"Remote data folder detected: {env_val}. Using local Parquet_Exports for cache generation.")
+        PARENT_RUNS_FOLDER = Path("Parquet_Exports")
+        CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
+    else:
+        PARENT_RUNS_FOLDER = Path(env_val)
+        CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
 else:
     PARENT_RUNS_FOLDER = Path("Parquet_Exports")
     CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
