@@ -30,14 +30,26 @@ from typing import Dict
 # -------------------------
 # CACHE_DIR = Path(__file__).parent / "cache"
 # CACHE_DIR.mkdir(exist_ok=True)
-remote_drive_path = "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
 
-if os.getenv("PARENT_RUNS_FOLDER"):  # GitHub Actions mode
+# --- Path logic: handle Drive vs GitHub folder structure ---
+remote_drive_path = "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
+github_path = Path("Parquet_Exports")
+
+if os.getenv("GITHUB_ACTIONS") == "true":
+    # Running in GitHub Actions: use direct Parquet_Exports folder
+    PARENT_RUNS_FOLDER = github_path
+elif os.getenv("PARENT_RUNS_FOLDER"):
+    # Explicitly set (e.g. workflow): use as is
     PARENT_RUNS_FOLDER = os.getenv("PARENT_RUNS_FOLDER")
-elif os.path.exists("Parquet_Exports"):  # Local laptop mode
-    PARENT_RUNS_FOLDER = Path("Parquet_Exports")
+elif os.path.exists("Parquet_Exports"):
+    # Local laptop: use direct Parquet_Exports folder
+    PARENT_RUNS_FOLDER = github_path
+elif os.path.exists("Container Plant Dashboard/Parquet_Exports"):
+    # Local Drive mount: use nested folder
+    PARENT_RUNS_FOLDER = Path("Container Plant Dashboard/Parquet_Exports")
 else:
-    PARENT_RUNS_FOLDER = remote_drive_path  # fallback
+    # Fallback: use remote drive path
+    PARENT_RUNS_FOLDER = remote_drive_path
 
 
 def load_cache(name: str) -> pd.DataFrame:

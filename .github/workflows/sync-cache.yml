@@ -32,9 +32,17 @@ jobs:
           mkdir -p ~/.config/rclone
           echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
 
-      - name: Generate fresh cache directly from Google Drive
+      - name: Set PARENT_RUNS_FOLDER for GitHub or Drive
+        run: |
+          if [ "$GITHUB_ACTIONS" = "true" ]; then
+            echo "PARENT_RUNS_FOLDER=Parquet_Exports" >> $GITHUB_ENV
+          else
+            echo "PARENT_RUNS_FOLDER=ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports" >> $GITHUB_ENV
+          fi
+
+      - name: Generate fresh cache
         env:
-          PARENT_RUNS_FOLDER: "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
+          PARENT_RUNS_FOLDER: ${{ env.PARENT_RUNS_FOLDER }}
         run: |
           python Hours_V31.py  # or: python generate_cache.py
 

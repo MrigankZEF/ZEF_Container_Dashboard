@@ -3,8 +3,8 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
+
 # Import all processing functions from Hours_V31.py
-# You may need to refactor Hours_V31.py to move these functions to a separate module if they use Streamlit or UI code.
 from Hours_V31 import (
     find_parquet_files, extract_db_file_name, compute_db_file_duration, compute_db_file_duration_raw,
     compute_all_runtimes, compute_reboiler_temperature_for_file, compute_sorbent_temperature_for_file,
@@ -18,6 +18,31 @@ from Hours_V31 import (
     compute_aec_oxygen_temperature_for_file, compute_aec_hydrogen_temperature_for_file,
     compute_aec_oxygen_pressure_for_file, compute_active_state_for_file
 )
+
+# --- Path logic: handle Drive vs GitHub folder structure ---
+remote_drive_path = "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
+github_path = Path("Parquet_Exports")
+
+if os.getenv("GITHUB_ACTIONS") == "true":
+    # Running in GitHub Actions: use direct Parquet_Exports folder
+    PARENT_RUNS_FOLDER = github_path
+    CACHE_DIR = github_path / "cache"
+elif os.getenv("PARENT_RUNS_FOLDER"):
+    # Explicitly set (e.g. workflow): use as is
+    PARENT_RUNS_FOLDER = Path(os.getenv("PARENT_RUNS_FOLDER"))
+    CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
+elif os.path.exists("Parquet_Exports"):
+    # Local laptop: use direct Parquet_Exports folder
+    PARENT_RUNS_FOLDER = github_path
+    CACHE_DIR = github_path / "cache"
+elif os.path.exists("Container Plant Dashboard/Parquet_Exports"):
+    # Local Drive mount: use nested folder
+    PARENT_RUNS_FOLDER = Path("Container Plant Dashboard/Parquet_Exports")
+    CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
+else:
+    # Fallback: use remote drive path
+    PARENT_RUNS_FOLDER = remote_drive_path
+    CACHE_DIR = Path("cache")
 
 CACHE_DIR = Path("Parquet_Exports/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
