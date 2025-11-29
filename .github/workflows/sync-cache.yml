@@ -6,46 +6,40 @@ on:
   workflow_dispatch:           # Manual trigger button
 
 jobs:
-  on:
-    schedule:
-      - cron: '0 */6 * * *'
-    workflow_dispatch:
+  sync-cache:
+    name: Sync cache folder to GitHub and Drive
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  jobs:
-    sync-cache:
-      name: Sync cache folder to GitHub and Drive
-      runs-on: ubuntu-latest
-      timeout-minutes: 60
-      steps:
-        - name: Checkout repo
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
+      - name: Install rclone
+        run: sudo apt-get update && sudo apt-get install -y rclone
 
-        - name: Install rclone
-          run: sudo apt-get update && sudo apt-get install -y rclone
+      - name: Load rclone config
+        env:
+          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
 
-        - name: Load rclone config
-          env:
-            RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
-          run: |
-            mkdir -p ~/.config/rclone
-            echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
+      - name: Upload entire cache folder to Drive
+        run: |
+          rclone sync cache "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports/cache" --create-empty-src-dirs --progress
 
-        - name: Upload entire cache folder to Drive
-          run: |
-            rclone sync cache "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports/cache" --create-empty-src-dirs --progress
-
-        - name: Commit and push entire cache folder to GitHub
-          run: |
-            git config user.name "Auto-sync Bot"
-            git config user.email "bot@noreply.github.com"
-            mkdir -p cache
-            touch cache/.gitkeep 2>/dev/null || true
-            git add cache/
-            if ! git diff --staged --quiet; then
-              git commit -m "Auto-sync full cache $(date +'%Y-%m-%d %H:%M')"
-              git push
-            else
-              echo "No cache changes"
-            fi
+      - name: Commit and push entire cache folder to GitHub
+        run: |
+          git config user.name "Auto-sync Bot"
+          git config user.email "bot@noreply.github.com"
+          mkdir -p cache
+          touch cache/.gitkeep 2>/dev/null || true
+          git add cache/
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-sync full cache $(date +'%Y-%m-%d %H:%M')"
+            git push
+          else
+            echo "No cache changes"
+          fi
