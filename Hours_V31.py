@@ -1,3 +1,9 @@
+def read_parquet_safe(path):
+    try:
+        return pd.read_parquet(path)
+    except Exception:
+        return pd.DataFrame()
+
 # streamlit_parquet_app.py
 # ---------------------------------------------------------
 # Parquet Data Explorer with Incremental Multi-Run Support
@@ -9,6 +15,7 @@
 # ---------------------------------------------------------
 
 import io
+import os
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -23,6 +30,15 @@ from typing import Dict
 # -------------------------
 # CACHE_DIR = Path(__file__).parent / "cache"
 # CACHE_DIR.mkdir(exist_ok=True)
+remote_drive_path = "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
+
+if os.getenv("PARENT_RUNS_FOLDER"):  # GitHub Actions mode
+    PARENT_RUNS_FOLDER = os.getenv("PARENT_RUNS_FOLDER")
+elif os.path.exists("Parquet_Exports"):  # Local laptop mode
+    PARENT_RUNS_FOLDER = Path("Parquet_Exports")
+else:
+    PARENT_RUNS_FOLDER = remote_drive_path  # fallback
+
 
 def load_cache(name: str) -> pd.DataFrame:
     path = CACHE_DIR / f"{name}.parquet"
@@ -124,9 +140,9 @@ with st.sidebar:
     st.markdown(f"**Using:** `{PARENT_RUNS_FOLDER}`")
     st.markdown("---")
     st.header("Plot Settings")
-    title = st.text_input("Overlay Plot Title", "Data Analysis")
-    xlab = st.text_input("X-axis label", "Time (s)")
-    ylab = st.text_input("Y-axis label", "Data")
+    title = st.text_input("Overlay Plot Title", "Data Analysis", key="sidebar_title_1")
+    xlab = st.text_input("X-axis label", "Time (s)", key="sidebar_xlab_1")
+    ylab = st.text_input("Y-axis label", "Data", key="sidebar_ylab_1")
 
 # -------------------------
 # Parquet Cache Helpers
@@ -155,6 +171,29 @@ if durations_df.empty:
     st.info("No cache found yet. Overlap filtering will be done from the second db file.")
     durations_df = pd.DataFrame(columns=["db File","Start Time Stamp (s)","End Time Stamp (s)"])
 
+# Only show sidebar config in local Streamlit mode
+if isinstance(PARENT_RUNS_FOLDER, Path):
+    default_parent = str(Path.cwd() / "Parquet_Exports")
+    with st.sidebar:
+        st.header("Configuration")
+        st.markdown(f"**Using:** `{PARENT_RUNS_FOLDER}`")
+        st.markdown("---")
+        st.header("Plot Settings")
+        title = st.text_input("Overlay Plot Title", "Data Analysis", key="sidebar_title_2")
+        xlab = st.text_input("X-axis label", "Time (s)", key="sidebar_xlab_2")
+        ylab = st.text_input("Y-axis label", "Data", key="sidebar_ylab_2")
+
+# Folder existence check for local mode only
+if isinstance(PARENT_RUNS_FOLDER, Path) and not PARENT_RUNS_FOLDER.exists():
+    st.error(f"Parquet exports folder not found: {PARENT_RUNS_FOLDER}")
+    st.stop()
+
+# Load Parquet cache for durations_df
+durations_df = load_cache("db_file_duration")
+if durations_df.empty:
+    st.info("No cache found yet. Overlap filtering will be done from the second db file.")
+    durations_df = pd.DataFrame(columns=["db File","Start Time Stamp (s)","End Time Stamp (s)"])
+
 
 # -------------------------
 # Helpers
@@ -167,31 +206,9 @@ def to_seconds_from_datetime(series: pd.Series) -> pd.Series:
     out = pd.Series(np.nan, index=ts.index, dtype="float64")
     if mask.any():
         out.loc[mask] = ts.loc[mask].values.astype("datetime64[ns]").astype("int64") / 1e9
+
+    # ...existing code...
     return out
-
-
-def read_parquet_safe(path: Path) -> pd.DataFrame:
-    """Safely read a parquet file, return empty DataFrame on failure."""
-    try:
-        return pd.read_parquet(path)
-    except Exception as e:
-        st.warning(f"Failed to read parquet file {path.name}: {e}")
-        return pd.DataFrame()
-
-
-def read_messages_parquet(path: Path) -> pd.DataFrame:
-    """
-    Read a messages parquet file and normalize the timestamp column to seconds.
-    """
-    df = pd.read_parquet(path)
-    if "timestamp" not in df.columns:
-        raise ValueError(f"Expected a 'timestamp' column in {path.name}.")
-    if pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
-        df["timestamp"] = to_seconds_from_datetime(df["timestamp"])
-    else:
-        df["timestamp"] = pd.to_numeric(df["timestamp"], errors="coerce")
-    return df
-
 def read_messages_with_overlap(messages_file: Path) -> pd.DataFrame:
     return read_parquet_safe(messages_file)
 
@@ -2382,7 +2399,7 @@ if selected_subsystem == "Direct Air Capture":
 
     # Read messages parquet
     try:
-        df_msg = read_messages_parquet(messages_path)
+        df_msg = read_messages_with_overlap(messages_path)
     except Exception as e:
         st.error(f"Failed to read selected messages parquet ({messages_path}): {e}")
         st.stop()

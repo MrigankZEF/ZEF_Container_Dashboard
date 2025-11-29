@@ -1,5 +1,3 @@
-name: Auto-sync cache from Google Drive
-
 on:
   schedule:
     - cron: '0 */6 * * *'
@@ -7,64 +5,53 @@ on:
 
 jobs:
   sync-cache:
+    name: Auto-sync cache from Google Drive
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # ← forces full clone so empty folders exist
-
+          fetch-depth: 0
 
       - name: Install rclone
         run: sudo apt-get update && sudo apt-get install -y rclone
 
-
-      - name: Sync all Parquet_Exports data folders (excluding cache) from Google Drive
-        env:
-          RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
-        run: |
-          mkdir -p ~/.config/rclone
-          echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
-          # Sync all Parquet_Exports folders except cache
-          rclone sync "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports" Parquet_Exports --exclude 'cache/**' --progress || true
-
-      - name: List all files after sync
-        run: |
-          find Parquet_Exports
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install Python dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install pandas pyarrow plotly streamlit
 
-      - name: Generate Parquet cache
-        run: |
-          python generate_cache.py
-
-      - name: Sync cache folder
+      - name: Load rclone config
         env:
           RCLONE_CONFIG_CONTENT: ${{ secrets.RCLONE_CONFIG }}
         run: |
           mkdir -p ~/.config/rclone
           echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
-          rclone sync "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports/cache" Parquet_Exports/cache --create-empty-src-dirs --progress || true
 
-      - name: Commit and push if changed
+      - name: Generate fresh cache directly from Google Drive
+        env:
+          PARENT_RUNS_FOLDER: "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
+        run: |
+          python Hours_V31.py  # or: python generate_cache.py
+
+      - name: Upload new cache back to Drive
+        run: |
+          rclone sync cache "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports/cache" --create-empty-src-dirs --progress
+
+      - name: Commit and push updated cache to GitHub
         run: |
           git config user.name "Auto-sync Bot"
           git config user.email "bot@noreply.github.com"
-          
-          # Ensure the folder exists and is tracked
-          mkdir -p Parquet_Exports/cache
-          touch Parquet_Exports/cache/.gitkeep 2>/dev/null || true
-          
-          git add Parquet_Exports/cache/
-          if git diff --staged --quiet; then
-            echo "No changes in Parquet_Exports/cache"
-          else
+          mkdir -p cache
+          touch cache/.gitkeep 2>/dev/null || true
+          git add cache/
+          if ! git diff --staged --quiet; then
             git commit -m "Auto-update cache $(date +'%Y-%m-%d %H:%M')"
             git push
+          else
+            echo "No cache changes"
           fi
