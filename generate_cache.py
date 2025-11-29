@@ -19,34 +19,20 @@ from Hours_V31 import (
     compute_aec_oxygen_pressure_for_file, compute_active_state_for_file
 )
 
-# --- Path logic: handle Drive vs GitHub folder structure ---
-remote_drive_path = "ZEF_Container_Dashboard:/Container Plant Dashboard/Parquet_Exports"
-github_path = Path("Parquet_Exports")
+# UNIVERSAL PATH LOGIC — works everywhere
+REMOTE_PATH = "ZEF_Container_Dashboard:Parquet_Exports"
 
-if os.getenv("GITHUB_ACTIONS") == "true":
-    # Running in GitHub Actions: use direct Parquet_Exports folder
-    PARENT_RUNS_FOLDER = github_path
-    CACHE_DIR = github_path / "cache"
-elif os.getenv("PARENT_RUNS_FOLDER"):
-    # Explicitly set (e.g. workflow): use as is
-    PARENT_RUNS_FOLDER = Path(os.getenv("PARENT_RUNS_FOLDER"))
-    CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
-elif os.path.exists("Parquet_Exports"):
-    # Local laptop: use direct Parquet_Exports folder
-    PARENT_RUNS_FOLDER = github_path
-    CACHE_DIR = github_path / "cache"
-elif os.path.exists("Container Plant Dashboard/Parquet_Exports"):
-    # Local Drive mount: use nested folder
-    PARENT_RUNS_FOLDER = Path("Container Plant Dashboard/Parquet_Exports")
-    CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
-else:
-    # Fallback: use remote drive path
-    PARENT_RUNS_FOLDER = remote_drive_path
+if os.getenv("PARENT_RUNS_FOLDER"):
+    PARENT_RUNS_FOLDER = os.getenv("PARENT_RUNS_FOLDER")   # GitHub Actions uses this
     CACHE_DIR = Path("cache")
+else:
+    PARENT_RUNS_FOLDER = Path("Parquet_Exports")
+    CACHE_DIR = PARENT_RUNS_FOLDER / "cache"
 
-CACHE_DIR = Path("Parquet_Exports/cache")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
-PARENT_RUNS_FOLDER = Path("Parquet_Exports")
+
+print(f"Data folder: {PARENT_RUNS_FOLDER}")
+print(f"Cache folder: {CACHE_DIR}")
 
 
 # Merge new results with existing cache and save
