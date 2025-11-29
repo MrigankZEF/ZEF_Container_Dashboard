@@ -36,7 +36,11 @@ jobs:
           echo "$RCLONE_CONFIG_CONTENT" > ~/.config/rclone/rclone.conf
 
       # This is the key: tell your script to read directly from Google Drive
-      - name: Generate fresh cache using generate_cache.py
+      - name: Install Python dependencies
+        run: |
+          pip install pandas pyarrow plotly streamlit
+
+      - name: Generate fresh cache
         env:
           PARENT_RUNS_FOLDER: "ZEF_Container_Dashboard:Parquet_Exports"   # CORRECT PATH (no "Container Plant Dashboard")
         run: |
