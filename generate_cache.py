@@ -54,6 +54,7 @@ existing_db_files = set(existing_runtime["db File"].dropna().astype(str).unique(
 
 # Find all command/message pairs
 command_files = find_parquet_files(PARENT_RUNS_FOLDER, "commands.parquet")
+print("Found command files:", [str(f) for f in command_files])
 paired_files = []
 for cmd in command_files:
     msg = cmd.parent / "messages.parquet"
