@@ -72,15 +72,29 @@ existing_runtime = load_cache("runtime")
 existing_db_files = set(existing_runtime["db File"].dropna().astype(str).unique()) if not existing_runtime.empty else set()
 
 # Find all command/message pairs
+
+# Print all data folders and cache status
 command_files = find_parquet_files(PARENT_RUNS_FOLDER, "commands.parquet")
-print("Found command files:", [str(f) for f in command_files])
+all_db_files = [extract_db_file_name(cmd) for cmd in command_files]
+to_process = [cmd for cmd in command_files if extract_db_file_name(cmd) not in existing_db_files]
+print(f"\nFound {len(command_files)} data folders.")
+print(f"Already cached: {len(existing_db_files)}")
+print(f"To process: {len(to_process)}\n")
+if len(to_process) > 0:
+    print("Files to process:")
+    for i, cmd in enumerate(to_process, 1):
+        print(f"  {i}. {extract_db_file_name(cmd)}")
+else:
+    print("All files are already cached.")
+
 paired_files = []
-for cmd in command_files:
+for cmd in to_process:
     msg = cmd.parent / "messages.parquet"
-    if msg.exists():
-        db_file = extract_db_file_name(cmd)
-        if db_file not in existing_db_files:
-            paired_files.append((cmd, msg))
+    db_file = extract_db_file_name(cmd)
+    if not msg.exists():
+        print(f"[ERROR] Missing messages.parquet for {db_file}. Skipping.")
+        continue
+    paired_files.append((cmd, msg))
 
 # Prepare collectors
 all_db_file_duration = []
@@ -101,88 +115,94 @@ all_active_state = []
 
 # For headless operation, pass empty DataFrames for durations_df where required
 
-for commands_file, messages_file in paired_files:
-    db_file = extract_db_file_name(commands_file)
-    print(f"Processing db file: {db_file}")
-    df_db_file_duration = compute_db_file_duration(messages_file)
-    df_run = compute_all_runtimes(messages_file, pd.DataFrame())
-    df_reb = compute_reboiler_temperature_for_file(messages_file, pd.DataFrame())
-    df_sorb = compute_sorbent_temperature_for_file(messages_file, pd.DataFrame())
-    df_pwm = compute_big_fan_pwm_for_file(messages_file)
-    df_rpm = compute_recycle_pump_1_rpm_for_file(messages_file, pd.DataFrame())
-    df_rpm2 = compute_recycle_pump_2_rpm_for_file(messages_file, pd.DataFrame())
-    df_weather = compute_weather_classification_for_file(messages_file)
-    df_mean = compute_mean(messages_file)
-    df_mean_residence = compute_mean_residence(commands_file, messages_file)
-    df_comp1 = compute_compressor_first_stage_pressure_for_file(messages_file, pd.DataFrame())
-    df_comp2 = compute_compressor_second_stage_pressure_for_file(messages_file, pd.DataFrame())
-    df_comp1_temp = compute_compressor_first_stage_temperature_for_file(messages_file, pd.DataFrame())
-    df_comp2_temp = compute_compressor_second_stage_temperature_for_file(messages_file, pd.DataFrame())
-    df_aec1 = compute_aec_stack_1_current_for_file(messages_file, pd.DataFrame())
-    df_aec2 = compute_aec_stack_2_current_for_file(messages_file, pd.DataFrame())
-    df_aec3 = compute_aec_stack_3_current_for_file(messages_file, pd.DataFrame())
-    df_aec4 = compute_aec_stack_4_current_for_file(messages_file, pd.DataFrame())
-    df_aec1_den = compute_aec_stack_1_current_density_for_file(messages_file, pd.DataFrame())
-    df_aec2_den = compute_aec_stack_2_current_density_for_file(messages_file, pd.DataFrame())
-    df_aec3_den = compute_aec_stack_3_current_density_for_file(messages_file, pd.DataFrame())
-    df_aec4_den = compute_aec_stack_4_current_density_for_file(messages_file, pd.DataFrame())
-    df_aec_oxy_temp = compute_aec_oxygen_temperature_for_file(messages_file, pd.DataFrame())
-    df_aec_hyd_temp = compute_aec_hydrogen_temperature_for_file(messages_file, pd.DataFrame())
-    df_aec_oxy_pres = compute_aec_oxygen_pressure_for_file(messages_file, pd.DataFrame())
-    df_active = compute_active_state_for_file(messages_file, pd.DataFrame())
 
-    if not df_db_file_duration.empty:
-        all_db_file_duration.append(df_db_file_duration)
-    if not df_run.empty:
-        all_runtime.append(df_run)
-    if not df_reb.empty:
-        all_reboiler.append(df_reb)
-    if not df_sorb.empty:
-        all_sorb.append(df_sorb)
-    if not df_pwm.empty:
-        all_bigfan_pwm.append(df_pwm)
-    if not df_rpm.empty:
-        all_recycle_pump_1_rpm.append(df_rpm)
-    if not df_rpm2.empty:
-        all_recycle_pump_2_rpm.append(df_rpm2)
-    if not df_weather.empty:
-        all_weather.append(df_weather)
-    if not df_mean.empty:
-        all_mean.append(df_mean)
-    if not df_mean_residence.empty:
-        all_mean_residence.append(df_mean_residence)
-    if not df_comp1.empty:
-        all_compressor_stage_1.append(df_comp1)
-    if not df_comp2.empty:
-        all_compressor_stage_2.append(df_comp2)
-    if not df_comp1_temp.empty:
-        all_compressor_stage_1_temp.append(df_comp1_temp)
-    if not df_comp2_temp.empty:
-        all_compressor_stage_2_temp.append(df_comp2_temp)
-    if not df_aec1.empty:
-        all_aec_stack_1_current.append(df_aec1)
-    if not df_aec2.empty:
-        all_aec_stack_2_current.append(df_aec2)
-    if not df_aec3.empty:
-        all_aec_stack_3_current.append(df_aec3)
-    if not df_aec4.empty:
-        all_aec_stack_4_current.append(df_aec4)
-    if not df_aec1_den.empty:
-        all_aec_stack_1_current_density.append(df_aec1_den)
-    if not df_aec2_den.empty:
-        all_aec_stack_2_current_density.append(df_aec2_den)
-    if not df_aec3_den.empty:
-        all_aec_stack_3_current_density.append(df_aec3_den)
-    if not df_aec4_den.empty:
-        all_aec_stack_4_current_density.append(df_aec4_den)
-    if not df_aec_oxy_temp.empty:
-        all_aec_oxygen_temp.append(df_aec_oxy_temp)
-    if not df_aec_hyd_temp.empty:
-        all_aec_hydrogen_temp.append(df_aec_hyd_temp)
-    if not df_aec_oxy_pres.empty:
-        all_aec_oxygen_pressure.append(df_aec_oxy_pres)
-    if not df_active.empty:
-        all_active_state.append(df_active)
+total_files = len(paired_files)
+for idx, (commands_file, messages_file) in enumerate(paired_files, 1):
+    db_file = extract_db_file_name(commands_file)
+    print(f"\n[{idx}/{total_files}] Processing db file: {db_file}")
+    try:
+        df_db_file_duration = compute_db_file_duration(messages_file)
+        df_run = compute_all_runtimes(messages_file, pd.DataFrame())
+        df_reb = compute_reboiler_temperature_for_file(messages_file, pd.DataFrame())
+        df_sorb = compute_sorbent_temperature_for_file(messages_file, pd.DataFrame())
+        df_pwm = compute_big_fan_pwm_for_file(messages_file)
+        df_rpm = compute_recycle_pump_1_rpm_for_file(messages_file, pd.DataFrame())
+        df_rpm2 = compute_recycle_pump_2_rpm_for_file(messages_file, pd.DataFrame())
+        df_weather = compute_weather_classification_for_file(messages_file)
+        df_mean = compute_mean(messages_file)
+        df_mean_residence = compute_mean_residence(commands_file, messages_file)
+        df_comp1 = compute_compressor_first_stage_pressure_for_file(messages_file, pd.DataFrame())
+        df_comp2 = compute_compressor_second_stage_pressure_for_file(messages_file, pd.DataFrame())
+        df_comp1_temp = compute_compressor_first_stage_temperature_for_file(messages_file, pd.DataFrame())
+        df_comp2_temp = compute_compressor_second_stage_temperature_for_file(messages_file, pd.DataFrame())
+        df_aec1 = compute_aec_stack_1_current_for_file(messages_file, pd.DataFrame())
+        df_aec2 = compute_aec_stack_2_current_for_file(messages_file, pd.DataFrame())
+        df_aec3 = compute_aec_stack_3_current_for_file(messages_file, pd.DataFrame())
+        df_aec4 = compute_aec_stack_4_current_for_file(messages_file, pd.DataFrame())
+        df_aec1_den = compute_aec_stack_1_current_density_for_file(messages_file, pd.DataFrame())
+        df_aec2_den = compute_aec_stack_2_current_density_for_file(messages_file, pd.DataFrame())
+        df_aec3_den = compute_aec_stack_3_current_density_for_file(messages_file, pd.DataFrame())
+        df_aec4_den = compute_aec_stack_4_current_density_for_file(messages_file, pd.DataFrame())
+        df_aec_oxy_temp = compute_aec_oxygen_temperature_for_file(messages_file, pd.DataFrame())
+        df_aec_hyd_temp = compute_aec_hydrogen_temperature_for_file(messages_file, pd.DataFrame())
+        df_aec_oxy_pres = compute_aec_oxygen_pressure_for_file(messages_file, pd.DataFrame())
+        df_active = compute_active_state_for_file(messages_file, pd.DataFrame())
+
+        if not df_db_file_duration.empty:
+            all_db_file_duration.append(df_db_file_duration)
+        if not df_run.empty:
+            all_runtime.append(df_run)
+        if not df_reb.empty:
+            all_reboiler.append(df_reb)
+        if not df_sorb.empty:
+            all_sorb.append(df_sorb)
+        if not df_pwm.empty:
+            all_bigfan_pwm.append(df_pwm)
+        if not df_rpm.empty:
+            all_recycle_pump_1_rpm.append(df_rpm)
+        if not df_rpm2.empty:
+            all_recycle_pump_2_rpm.append(df_rpm2)
+        if not df_weather.empty:
+            all_weather.append(df_weather)
+        if not df_mean.empty:
+            all_mean.append(df_mean)
+        if not df_mean_residence.empty:
+            all_mean_residence.append(df_mean_residence)
+        if not df_comp1.empty:
+            all_compressor_stage_1.append(df_comp1)
+        if not df_comp2.empty:
+            all_compressor_stage_2.append(df_comp2)
+        if not df_comp1_temp.empty:
+            all_compressor_stage_1_temp.append(df_comp1_temp)
+        if not df_comp2_temp.empty:
+            all_compressor_stage_2_temp.append(df_comp2_temp)
+        if not df_aec1.empty:
+            all_aec_stack_1_current.append(df_aec1)
+        if not df_aec2.empty:
+            all_aec_stack_2_current.append(df_aec2)
+        if not df_aec3.empty:
+            all_aec_stack_3_current.append(df_aec3)
+        if not df_aec4.empty:
+            all_aec_stack_4_current.append(df_aec4)
+        if not df_aec1_den.empty:
+            all_aec_stack_1_current_density.append(df_aec1_den)
+        if not df_aec2_den.empty:
+            all_aec_stack_2_current_density.append(df_aec2_den)
+        if not df_aec3_den.empty:
+            all_aec_stack_3_current_density.append(df_aec3_den)
+        if not df_aec4_den.empty:
+            all_aec_stack_4_current_density.append(df_aec4_den)
+        if not df_aec_oxy_temp.empty:
+            all_aec_oxygen_temp.append(df_aec_oxy_temp)
+        if not df_aec_hyd_temp.empty:
+            all_aec_hydrogen_temp.append(df_aec_hyd_temp)
+        if not df_aec_oxy_pres.empty:
+            all_aec_oxygen_pressure.append(df_aec_oxy_pres)
+        if not df_active.empty:
+            all_active_state.append(df_active)
+    except Exception as e:
+        print(f"[ERROR] Failed to process {db_file}: {e}")
+        continue
 
 # Concatenate and save all cache files
 
